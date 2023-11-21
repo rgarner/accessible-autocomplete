@@ -1,8 +1,10 @@
-import webpack from 'webpack'
-import path from 'path'
-import CopyWebpackPlugin from 'copy-webpack-plugin'
+import { join } from 'path'
+import { cwd } from 'process'
 import TerserPlugin from 'terser-webpack-plugin'
+import webpack from 'webpack'
+
 const ENV = process.env.NODE_ENV || 'development'
+const PORT = process.env.PORT || 8080
 
 const plugins = [
   new webpack.NoEmitOnErrorsPlugin(),
@@ -11,16 +13,8 @@ const plugins = [
   })
 ]
 
-const developmentPlugins = [
-  new CopyWebpackPlugin({
-    patterns: [
-      { from: './autocomplete.css', to: 'accessible-autocomplete.min.css' }
-    ]
-  })
-]
-
 const config = {
-  context: path.resolve(__dirname, 'src'),
+  context: join(cwd(), 'src'),
 
   optimization: {
     minimize: ENV === 'production',
@@ -39,7 +33,7 @@ const config = {
   resolve: {
     extensions: ['.js'],
     modules: [
-      path.resolve(__dirname, 'node_modules'),
+      join(cwd(), 'node_modules'),
       'node_modules'
     ]
   },
@@ -48,7 +42,7 @@ const config = {
     rules: [
       {
         test: /\.js$/,
-        include: path.resolve(__dirname, 'src'),
+        include: join(cwd(), 'src'),
         enforce: 'pre',
         loader: 'source-map-loader'
       },
@@ -77,38 +71,41 @@ const config = {
   },
 
   mode: ENV === 'production' ? 'production' : 'development',
-  devtool: ENV === 'production' ? 'source-map' : 'cheap-module-eval-source-map',
-
-  devServer: {
-    before (app) {
-      // Grab potential subdirectory with :dir*?
-      app.get('/dist/:dir*?/:filename', (request, response) => {
-        if (!request.params.dir || request.params.dir === undefined) {
-          response.redirect('/' + request.params.filename)
-        } else {
-          response.redirect('/' + request.params.dir + '/' + request.params.filename)
-        }
-      })
-    },
-    port: process.env.PORT || 8080,
-    host: '0.0.0.0',
-    publicPath: '/dist/',
-    contentBase: ['./examples', './src'],
-    historyApiFallback: true,
-    open: true,
-    watchContentBase: true,
-    disableHostCheck: true
-  }
+  devtool: ENV === 'production' ? 'source-map' : 'cheap-module-eval-source-map'
 }
 
 const bundleStandalone = {
   ...config,
+  devServer: {
+    allowedHosts: 'all',
+    host: '0.0.0.0',
+    open: '/dist',
+    port: PORT,
+    proxy: {
+      '/dist/accessible-autocomplete.min.css': {
+        target: `http://0.0.0.0:${PORT}`,
+        pathRewrite: () => '/dist/autocomplete.css'
+      }
+    },
+    static: [
+      {
+        directory: join(cwd(), 'src'),
+        publicPath: '/dist',
+        watch: true
+      },
+      {
+        directory: join(cwd(), 'examples'),
+        publicPath: '/dist',
+        watch: true
+      }
+    ]
+  },
   entry: {
     'accessible-autocomplete.min': './wrapper.js'
   },
   output: {
-    path: path.resolve(__dirname, 'dist'),
-    publicPath: '/',
+    path: join(cwd(), 'dist'),
+    publicPath: '/dist',
     filename: '[name].js',
     library: 'accessibleAutocomplete',
     libraryExport: 'default',
@@ -118,10 +115,6 @@ const bundleStandalone = {
     .concat([new webpack.DefinePlugin({
       'process.env.COMPONENT_LIBRARY': '"PREACT"'
     })])
-    .concat(ENV === 'development'
-      ? developmentPlugins
-      : []
-    )
 }
 
 const bundlePreact = {
@@ -130,7 +123,7 @@ const bundlePreact = {
     'lib/accessible-autocomplete.preact.min': './autocomplete.js'
   },
   output: {
-    path: path.resolve(__dirname, 'dist'),
+    path: join(cwd(), 'dist'),
     publicPath: '/',
     filename: '[name].js',
     library: 'Autocomplete',
@@ -148,10 +141,6 @@ const bundlePreact = {
     .concat([new webpack.DefinePlugin({
       'process.env.COMPONENT_LIBRARY': '"PREACT"'
     })])
-    .concat(ENV === 'development'
-      ? developmentPlugins
-      : []
-    )
 }
 
 const bundleReact = {
@@ -160,7 +149,7 @@ const bundleReact = {
     'lib/accessible-autocomplete.react.min': './autocomplete.js'
   },
   output: {
-    path: path.resolve(__dirname, 'dist'),
+    path: join(cwd(), 'dist'),
     publicPath: '/',
     filename: '[name].js',
     library: 'Autocomplete',
@@ -179,13 +168,9 @@ const bundleReact = {
     .concat([new webpack.DefinePlugin({
       'process.env.COMPONENT_LIBRARY': '"REACT"'
     })])
-    .concat(ENV === 'development'
-      ? developmentPlugins
-      : []
-    )
 }
 
-module.exports = [
+export default [
   bundleStandalone,
   bundlePreact,
   bundleReact
