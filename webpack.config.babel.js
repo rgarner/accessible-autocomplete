@@ -29,8 +29,6 @@ const config = {
         format: { comments: false },
 
         // Compatibility workarounds
-        ecma: 5,
-        ie8: true,
         safari10: true
       }
     })]
