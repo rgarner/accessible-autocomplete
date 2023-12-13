@@ -1,4 +1,5 @@
 import { createElement, Component } from 'preact' /** @jsx createElement */
+import { debounce } from './debounce'
 import Status from './status'
 import DropdownArrowDown from './dropdown-arrow-down'
 
@@ -41,6 +42,7 @@ export default class Autocomplete extends Component {
     defaultValue: '',
     displayMenu: 'inline',
     minLength: 0,
+    debounceMs: 0,
     name: 'input-autocomplete',
     placeholder: '',
     onConfirm: () => {},
@@ -65,10 +67,14 @@ export default class Autocomplete extends Component {
       menuOpen: false,
       options: props.defaultValue ? [props.defaultValue] : [],
       query: props.defaultValue,
+      debouncing: false,
       validChoiceMade: false,
       selected: null,
       ariaHint: true
     }
+
+    const { source, debounceMs } = this.props
+    this.debouncedSource = debounceMs > 0 ? debounce(source, debounceMs) : source
 
     this.handleComponentBlur = this.handleComponentBlur.bind(this)
     this.handleKeyDown = this.handleKeyDown.bind(this)
@@ -211,7 +217,7 @@ export default class Autocomplete extends Component {
   }
 
   handleInputChange (event) {
-    const { minLength, source, showAllValues } = this.props
+    const { minLength, showAllValues } = this.props
     const autoselect = this.hasAutoselect()
     const query = event.target.value
     const queryEmpty = query.length === 0
@@ -225,9 +231,11 @@ export default class Autocomplete extends Component {
 
     const searchForOptions = showAllValues || (!queryEmpty && queryChanged && queryLongEnough)
     if (searchForOptions) {
-      source(query, (options) => {
+      this.setState({ debouncing: true })
+      this.debouncedSource(query, (options) => {
         const optionsAvailable = options.length > 0
         this.setState({
+          debouncing: false,
           menuOpen: optionsAvailable,
           options,
           selected: (autoselect && optionsAvailable) ? 0 : -1,
@@ -420,7 +428,7 @@ export default class Autocomplete extends Component {
       dropdownArrow: dropdownArrowFactory,
       menuAttributes
     } = this.props
-    const { focused, hovered, menuOpen, options, query, selected, ariaHint, validChoiceMade } = this.state
+    const { focused, hovered, menuOpen, options, debouncing, query, selected, ariaHint, validChoiceMade } = this.state
     const autoselect = this.hasAutoselect()
 
     const inputFocused = focused === -1
@@ -478,6 +486,7 @@ export default class Autocomplete extends Component {
           length={options.length}
           queryLength={query.length}
           minQueryLength={minLength}
+          autocompleteDebouncing={debouncing}
           selectedOption={this.templateInputValue(options[selected])}
           selectedOptionIndex={selected}
           validChoiceMade={validChoiceMade}
@@ -553,7 +562,7 @@ export default class Autocomplete extends Component {
             )
           })}
 
-          {showNoOptionsFound && (
+          {showNoOptionsFound && !debouncing && (
             <li className={`${optionClassName} ${optionClassName}--no-results`}>{tNoResults()}</li>
           )}
         </ul>

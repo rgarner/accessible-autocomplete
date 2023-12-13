@@ -1,24 +1,11 @@
 import { createElement, Component } from 'preact' /** @jsx createElement */
+import { debounce } from './debounce'
 
-const debounce = function (func, wait, immediate) {
-  var timeout
-  return function () {
-    var context = this
-    var args = arguments
-    var later = function () {
-      timeout = null
-      if (!immediate) func.apply(context, args)
-    }
-    var callNow = immediate && !timeout
-    clearTimeout(timeout)
-    timeout = setTimeout(later, wait)
-    if (callNow) func.apply(context, args)
-  }
-}
 const statusDebounceMillis = 1400
 
 export default class Status extends Component {
   static defaultProps = {
+    autocompleteDebouncing: false,
     tQueryTooShort: (minQueryLength) => `Type in ${minQueryLength} or more characters for results`,
     tNoResults: () => 'No search results',
     tSelectedOption: (selectedOption, length, index) => `${selectedOption} ${index + 1} of ${length} is highlighted`,
@@ -41,7 +28,7 @@ export default class Status extends Component {
     const that = this
     this.debounceStatusUpdate = debounce(function () {
       if (!that.state.debounced) {
-        const shouldSilence = !that.props.isInFocus || that.props.validChoiceMade
+        const shouldSilence = !that.props.isInFocus || that.props.validChoiceMade || that.props.autocompleteDebouncing
         that.setState(({ bump }) => ({ bump: !bump, debounced: true, silenced: shouldSilence }))
       }
     }, statusDebounceMillis)
